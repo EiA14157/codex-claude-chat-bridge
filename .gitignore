@@ -1,0 +1,12 @@
+node_modules/
+.bridge/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+

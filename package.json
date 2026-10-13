@@ -1,0 +1,15 @@
+{
+  "name": "codex-claude-chat-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fail-closed local prototype for an existing Codex desktop chat and Claude Code session bridge",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:mcp": "node --test integration/*.test.mjs",
+    "demo": "node src/cli.mjs demo",
+    "check": "node --check src/core.mjs && node --check src/adapters.mjs && node --check src/mcp.mjs && node --check src/cli.mjs && node --test test/*.test.mjs"
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.28.0" }
+}
