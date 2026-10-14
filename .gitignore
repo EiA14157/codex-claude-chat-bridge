@@ -9,4 +9,17 @@ node_modules/
 !.env.example
 coverage/
 *.log
+*.zip
+*.png
+*.jpg
+*.pdf
+.review/
+.publish/
+review-fixes/
+browser-extension-review/
+browser-profiles/
+.codex/
+.agents/
+docs/*INSTRUCTION*.txt
+docs/*REQUEST*.json
 

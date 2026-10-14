@@ -7,6 +7,10 @@ export class BridgeError extends Error {
   }
 }
 
+// Shared trusted-host error classification; all phases preserve the same terminal semantics.
+export const isDeniedError = error => ['LIVE_NOT_AUTHORIZED', 'PERMISSION_DENIED', 'REQUEST_DENIED', 'DENIED'].includes(error?.code);
+export const isCancelledError = error => ['DELIVERY_ABORTED', 'CANCELLED', 'REQUEST_CANCELLED', 'ABORT_ERR'].includes(error?.code) || error?.name === 'AbortError';
+
 export class CodexDesktopUnavailable {
   name = 'codex-desktop-unavailable';
   async validateTarget() {
@@ -64,6 +68,38 @@ export class ClaudeChannelAdapter {
         }
       }
     });
+    return { status: 'unconfirmed', receipt: null };
+  }
+}
+
+/** One stdout line can be a Monitor event, but never proof that Claude received it. */
+export class ClaudeMonitorStdoutAdapter {
+  name = 'claude-monitor-stdout';
+  #targetId; #writeLine; #simulationOnly;
+  constructor(writeLine, targetId, simulationOnly = true) {
+    if (typeof writeLine !== 'function') throw new BridgeError('INVALID_INPUT', 'A synchronous stdout writer is required.');
+    this.#writeLine = writeLine; this.#targetId = targetId; this.#simulationOnly = simulationOnly;
+  }
+  async validateTarget(expected) {
+    if (!this.#simulationOnly) throw new BridgeError('SESSION_UNVERIFIED', 'Monitor availability and the exact live session binding have not been validated.');
+    if (expected !== this.#targetId) throw new BridgeError('TARGET_MISMATCH', 'Monitor target changed.');
+    return { targetId: expected, simulation: true };
+  }
+  async deliver(envelope, { beforeWrite = () => {} } = {}) {
+    await this.validateTarget(envelope.targetId);
+    if (envelope.simulation !== true) throw new BridgeError('SESSION_UNVERIFIED', 'This Monitor candidate only emits simulation envelopes.');
+    const line = JSON.stringify({
+      kind: 'bridge_message', trust: 'external_untrusted', simulation: true,
+      pairId: envelope.pairId, messageId: envelope.id, sender: envelope.sender,
+      sourceId: envelope.sourceId, targetId: envelope.targetId,
+      inReplyTo: envelope.inReplyTo, content: renderExternalMessage(envelope)
+    }) + '\n';
+    beforeWrite();
+    const result = this.#writeLine(line);
+    if (result && typeof result.then === 'function') {
+      void Promise.resolve(result).catch(() => {});
+      throw new BridgeError('INVALID_RECEIPT', 'An asynchronous writer has an uncertain outcome.');
+    }
     return { status: 'unconfirmed', receipt: null };
   }
 }

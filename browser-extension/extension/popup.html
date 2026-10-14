@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>선택한 탭 브리지</title><link rel="stylesheet" href="popup.css"></head>
+<body><main id="bridge-ui">
+  <header><div class="mark">↔</div><div><p class="eyebrow">LOCAL EXTENSION · MVP</p><h1>선택한 탭 브리지</h1></div><span class="tag">후보</span></header>
+  <div class="notice">Grok 사이트 지원 미검증 · Codex 데스크톱 앱 미연결</div>
+  <section><div class="section-heading"><h2>1. 대상 선택</h2><span id="bound-state" class="status">중지됨</span></div>
+    <p class="hint">현재 탭은 직접 선택할 때만 접근합니다. 자동 감지·전체 사이트 접근은 없습니다.</p>
+    <button id="bind-mock" class="secondary">모의 대상 선택</button>
+    <details><summary>현재 탭의 DOM 계약 직접 지정</summary><div class="fields">
+      <label>입력창 CSS 선택자<input id="selector-input" placeholder="#composer" autocomplete="off"></label>
+      <label>전송 버튼 CSS 선택자<input id="selector-send" placeholder="#send" autocomplete="off"></label>
+      <label>단일 응답 요소 CSS 선택자<input id="selector-response" placeholder="#response" autocomplete="off"></label>
+      <label>대화 제목 요소 CSS 선택자<input id="selector-context" placeholder="#chat-title" autocomplete="off"></label>
+      <label>그 요소의 정확한 제목<input id="context-text" placeholder="직접 확인한 대화 제목" autocomplete="off"></label>
+      <button id="bind-current" class="secondary">이 현재 탭·문서를 선택</button>
+    </div></details>
+    <p id="target-label" class="target">선택된 대상 없음</p>
+  </section>
+  <section><h2>2. 무해한 전달 시험</h2>
+    <label>사용자가 제공하는 시험 내용<textarea id="source" rows="2" maxlength="4096" placeholder="예: 무해한 연결 확인"></textarea></label>
+    <p class="hint">내용은 저장하지 않습니다. 키·비밀번호·개인정보를 넣지 마세요. 준비 후 수정하면 전송이 거부됩니다.</p>
+    <button id="prepare" class="primary">새 요청 준비 · 2분 만료</button>
+    <div id="request-card" hidden><div class="request-meta"><strong id="request-state"></strong><span id="expiry"></span></div>
+      <code id="request-id"></code><label>현재 입력 내용의 시험 패킷 미리보기<textarea id="preview" rows="4" readonly></textarea></label>
+      <div class="button-row"><button id="send" class="primary">이 요청 1회 전달</button><button id="receive" class="secondary">응답 직접 읽기</button></div>
+      <div class="button-row"><button id="cancel" class="quiet">요청 취소</button><button id="deny" class="quiet">요청 거부</button></div>
+      <p class="hint">클릭 수락은 수신 확인이 아닙니다. 이미 시작된 시도는 중지로 되돌릴 수 없습니다.</p>
+    </div>
+    <div id="inbox" hidden><h3>로컬 수신함</h3><textarea id="received" rows="2" readonly></textarea><p class="hint">Codex 앱에는 전달되지 않았습니다. 공식 native/SDK 연결이 필요합니다.</p></div>
+  </section>
+  <section class="test-stop"><button id="mock-test" class="secondary">1회 모의 왕복 시험</button><button id="stop" class="danger">전체 중지</button></section>
+  <div id="feedback" role="status" aria-live="polite"></div>
+  <section class="log-section"><div class="section-heading"><h2>보이는 기록</h2><button id="refresh" class="quiet">새로고침</button></div><ol id="logs"></ol><p class="hint">요청 ID·상태만 로컬 저장합니다. 자동 반복·응답 자동 재전송은 없습니다. 전체 요청 예산 12개.</p></section>
+</main><script type="module" src="popup.mjs"></script></body></html>

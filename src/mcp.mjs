@@ -129,9 +129,15 @@ server.oninitialized = () => {
 function cleanup() {
   if (closed) return;
   closed = true; clearInterval(timer);
-  relay.release(pairId, actor, owner);
-  // Preserve any in-flight state for timeout/reconciliation on restart.
-  if (!pumping) relay.close();
+  try { relay.release(pairId, actor, owner); }
+  catch (error) {
+    // Refuse the unsafe write without letting a failed lease release prevent shutdown.
+    console.error(`bridge cleanup: ${error.code ?? 'BRIDGE_ERROR'}`);
+    process.exitCode = 1;
+  } finally {
+    // Preserve any in-flight state for timeout/reconciliation on restart.
+    if (!pumping) relay.close();
+  }
 }
 server.onclose = cleanup;
 server.onerror = error => console.error(`MCP error: ${error.code ?? 'PROTOCOL_ERROR'}`);
@@ -139,7 +145,7 @@ function shutdown() {
   cleanup();
   void server.close().catch(() => { process.exitCode = 1; });
 }
-// SDK 1.28.0 does not itself subscribe to stdin EOF. Stop our timer explicitly.
+// Explicitly stop this host's timer and transport on stdin EOF.
 process.stdin.once('end', shutdown);
 process.stdin.once('close', shutdown);
 process.stdin.once('error', shutdown);

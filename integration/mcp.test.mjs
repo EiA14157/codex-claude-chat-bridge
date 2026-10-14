@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Relay } from '../src/core.mjs';
@@ -12,9 +13,9 @@ import { Relay } from '../src/core.mjs';
 await import('@modelcontextprotocol/sdk/server/index.js');
 const root = resolve(import.meta.dirname, '..');
 class FakeMcpClient {
-  constructor(db, role, modeArgs = ['--allow-simulation']) {
+  constructor(db, role, modeArgs = ['--allow-simulation'], nodeArgs = []) {
     this.events = []; this.responses = new Map(); this.nextId = 0; this.stderr = '';
-    this.process = spawn(process.execPath, ['src/mcp.mjs', '--db', db, '--pair', 'test',
+    this.process = spawn(process.execPath, [...nodeArgs, 'src/mcp.mjs', '--db', db, '--pair', 'test',
       '--role', role, '--target', `sim-${role}`, ...modeArgs], { cwd: root, stdio: ['pipe', 'pipe', 'pipe'] });
     this.process.stderr.on('data', chunk => { this.stderr += chunk; });
     createInterface({ input: this.process.stdout }).on('line', line => {
@@ -68,12 +69,12 @@ class FakeMcpClient {
 }
 
 function setup(t, mode = 'simulation') {
-  const directory = mkdtempSync(join(tmpdir(), 'bridge-mcp-')), db = join(directory, 'state.sqlite');
+  const directory = mkdtempSync(join(tmpdir(), 'bridge MCP 한글-')), db = join(directory, 'state.sqlite');
   const relay = new Relay(db);
   relay.createPair({ id: 'test', mode, codex: 'sim-codex', claude: 'sim-claude' });
   const clients = [];
   t.after(async () => { for (const client of clients) await client.close(); relay.close(); rmSync(directory, { recursive: true, force: true }); });
-  return { relay, db, start: (role, args) => { const client = new FakeMcpClient(db, role, args); clients.push(client); return client; } };
+  return { relay, db, start: (role, args, nodeArgs) => { const client = new FakeMcpClient(db, role, args, nodeArgs); clients.push(client); return client; } };
 }
 
 test('official SDK stdio: initialized gating, Claude notifications, explicit two-way tools', async t => {
@@ -83,7 +84,8 @@ test('official SDK stdio: initialized gating, Claude notifications, explicit two
   assert.deepEqual(capabilities.experimental['claude/channel'], {});
   assert.equal(capabilities.experimental['claude/channel/permission'], undefined);
   await codex.initialize();
-  const first = await codex.call('bridge_send', { clientId: 'first', text: 'Compare options if useful.' });
+  const text = '무해한 테스트 "한글"\nCompare options if useful.';
+  const first = await codex.call('bridge_send', { clientId: 'first', text });
   assert.equal(first.data.status, 'queued');
   await delay(350);
   assert.equal(claude.events.length, 0, 'Nothing emitted before notifications/initialized');
@@ -91,6 +93,11 @@ test('official SDK stdio: initialized gating, Claude notifications, explicit two
   const event = await claude.event('notifications/claude/channel');
   assert.equal(event.params.meta.message_id, first.data.id);
   assert.equal(event.params.meta.simulation, 'true');
+  assert.equal(JSON.parse(event.params.content.split('\n').at(-1)).text, text);
+  // The other process can read the notification while its guarded finish is still in progress.
+  // Require the durable final transport state within a bound, rather than accepting dispatching.
+  const finishDeadline = Date.now() + 2000;
+  while (relay.message(first.data.id).status === 'dispatching' && Date.now() < finishDeadline) await delay(10);
   assert.equal(relay.message(first.data.id).status, 'unconfirmed');
   assert.equal((await claude.call('bridge_ack', { messageId: first.data.id })).data.status, 'acknowledged');
   const reply = await claude.call('bridge_send', { clientId: 'reply', text: 'Here is one trade-off.', inReplyTo: first.data.id });
@@ -132,4 +139,25 @@ test('stdio EOF exits naturally without a lingering polling interval', async t =
   for (let i = 0; i < 100 && client.process.exitCode === null; i++) await delay(20);
   assert.equal(client.process.exitCode, 0, `Client EOF did not exit naturally: ${client.stderr}`);
   assert.equal(client.process.signalCode, null);
+});
+
+test('unsafe lease-release failure still closes SDK transport and exits naturally on EOF', async t => {
+  const { db, start } = setup(t);
+  const preload = join(dirname(db), 'mock-release-failure.mjs');
+  writeFileSync(preload, `import { Relay, BridgeError } from ${JSON.stringify(pathToFileURL(join(root, 'src/core.mjs')).href)};\n` +
+    `Relay.prototype.release = function () { throw new BridgeError('UNSAFE_PATH', 'synthetic path change'); };\n`);
+  const client = start('claude', ['--allow-simulation'], ['--import', pathToFileURL(preload).href]);
+  await client.initialize(); client.process.stdin.end();
+  for (let i = 0; i < 100 && client.process.exitCode === null; i++) await delay(20);
+  assert.equal(client.process.exitCode, 1, client.stderr);
+  assert.equal(client.process.signalCode, null);
+  assert.match(client.stderr, /bridge cleanup: UNSAFE_PATH/);
+});
+
+test('unsupported 2026 MCP revision negotiates the Claude-compatible pinned revision', async t => {
+  const { start } = setup(t); const client = start('claude');
+  const response = await client.request('initialize', { protocolVersion: '2026-07-28',
+    capabilities: {}, clientInfo: { name: 'local-fake-client', version: '0.1.0' } });
+  assert.equal(response.result.protocolVersion, '2025-11-25');
+  client.notify('notifications/initialized');
 });

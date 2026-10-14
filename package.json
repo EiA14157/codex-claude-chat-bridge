@@ -2,14 +2,21 @@
   "name": "codex-claude-chat-bridge",
   "version": "0.1.0",
   "private": true,
-  "description": "Fail-closed local prototype for an existing Codex desktop chat and Claude Code session bridge",
+  "description": "Fail-closed relay and unverified selected-tab browser extension candidates for existing conversations",
   "type": "module",
-  "engines": { "node": ">=24 <25" },
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:mcp": "node --test integration/*.test.mjs",
     "demo": "node src/cli.mjs demo",
-    "check": "node --check src/core.mjs && node --check src/adapters.mjs && node --check src/mcp.mjs && node --check src/cli.mjs && node --test test/*.test.mjs"
+    "check": "node --check src/core.mjs && node --check src/adapters.mjs && node --check src/codex-app-tools.mjs && node --check src/claude-session-metadata.mjs && node --check src/claude-live-capabilities.mjs && node --check src/monitor.mjs && node --check src/one-shot-exchange.mjs && node --check src/mcp.mjs && node --check src/cli.mjs && node --test test/*.test.mjs",
+    "test:extension": "npm --prefix browser-extension run check",
+    "audit:package": "node scripts/audit-package.mjs",
+    "hash:package": "node scripts/hash-package.mjs"
   },
-  "dependencies": { "@modelcontextprotocol/sdk": "1.28.0" }
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0"
+  }
 }

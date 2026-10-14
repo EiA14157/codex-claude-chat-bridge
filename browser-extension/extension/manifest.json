@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Selected Tab Bridge · Candidate",
+  "version": "0.1.0",
+  "minimum_chrome_version": "106",
+  "description": "Explicit single-message tests with a user-selected DOM contract. Grok site support and Codex native binding are unverified.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": { "default_title": "선택한 탭 브리지", "default_popup": "popup.html" },
+  "background": { "service_worker": "background.mjs", "type": "module" },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'; base-uri 'none';" }
+}

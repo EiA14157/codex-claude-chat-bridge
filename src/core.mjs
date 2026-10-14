@@ -22,17 +22,41 @@ function role(value) {
   return value;
 }
 
+// Check before mkdir/open, including already-existing ancestors and SQLite sidecars.
+// This is fail-closed path validation, not a same-user ACL or atomic no-follow guarantee.
+function databasePathGuard(path) {
+  for (const file of [path, path + '-wal', path + '-shm', path + '-journal']) {
+    for (let current = file; ; current = dirname(current)) {
+      let stat;
+      try { stat = lstatSync(current); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+      if (stat) {
+        // Node lstat identifies Windows junctions as symbolic links as well.
+        if (stat.isSymbolicLink())
+          fail('UNSAFE_PATH', 'Database paths and ancestors must not redirect through symlinks or junctions.');
+        if (current === file && !stat.isFile()) fail('UNSAFE_PATH', 'Existing database and sidecar paths must be regular files.');
+        if (current !== file && !stat.isDirectory()) fail('UNSAFE_PATH', 'Database ancestors must be directories.');
+      }
+      if (dirname(current) === current) break;
+    }
+  }
+}
+
 /** Durable, bounded relay. IDs are routing locks, never proof of a live client identity. */
 export class Relay {
   constructor(path, { now = () => Date.now() } = {}) {
     this.now = now;
     if (path !== ':memory:') {
       path = resolve(path);
+      databasePathGuard(path);
       mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-      if (existsSync(path) && lstatSync(path).isSymbolicLink()) fail('UNSAFE_PATH', 'Database symlinks are not supported.');
+      databasePathGuard(path);
     }
+    Object.defineProperty(this, 'path', { value: path });
     const fresh = path !== ':memory:' && !existsSync(path);
     this.db = new DatabaseSync(path, { timeout: 5000 });
+    try { if (path !== ':memory:') databasePathGuard(path); }
+    catch (error) { this.db.close(); throw error; }
     if (fresh) chmodSync(path, 0o600);
     this.db.exec(`
       PRAGMA foreign_keys=ON;
@@ -70,11 +94,13 @@ export class Relay {
   }
   close() { this.db.close(); }
   tx(fn) {
+    if (this.path !== ':memory:') databasePathGuard(this.path);
     this.db.exec('BEGIN IMMEDIATE');
     try { const out = fn(); this.db.exec('COMMIT'); return out; }
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   audit(pairId, event, messageId = null) {
+    if (this.path !== ':memory:') databasePathGuard(this.path);
     this.db.prepare('INSERT INTO audit(at,pair_id,message_id,event) VALUES(?,?,?,?)')
       .run(this.now(), pairId, messageId, event);
   }
@@ -203,6 +229,7 @@ export class Relay {
     });
   }
   release(pairId, actor, owner) {
+    if (this.path !== ':memory:') databasePathGuard(this.path);
     this.db.prepare('DELETE FROM leases WHERE pair_id=? AND role=? AND owner=?').run(pairId, actor, owner);
   }
   claim(pairId, actor, targetId, owner) {
@@ -295,19 +322,28 @@ export async function dispatchOne(relay, pairId, actor, targetId, owner, adapter
   relay.acquire(pairId, actor, targetId, owner);
   const message = relay.claim(pairId, actor, targetId, owner);
   if (!message) return null;
-  let timeout;
+  const claimed = relay.db.prepare('SELECT claimed FROM messages WHERE id=?').get(message.id).claimed;
+  const deadline = claimed + p.delivery_timeout;
+  let timeout, closed = false, writeStarted = false;
   try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timeout = setTimeout(() => { closed = true; reject(new BridgeError('TIMEOUT', 'Delivery attempt timed out.')); }, Math.max(0, deadline - relay.now()));
+    });
     const result = await Promise.race([
       adapter.deliver(message, { beforeWrite: () => {
         // Adapters MUST call this immediately before their irreversible I/O.
         const current = relay.pair(pairId);
+        const now = relay.now();
+        if (closed || writeStarted || now >= deadline)
+          fail('DELIVERY_ABORTED', 'Delivery deadline passed or the single write attempt is no longer available.');
         const lease = relay.db.prepare('SELECT * FROM leases WHERE pair_id=? AND role=?').get(pairId, actor);
-        if (current.status !== 'active' || relay.now() >= current.expires || relay.message(message.id).status !== 'dispatching')
+        if (current.status !== 'active' || now >= current.expires || relay.message(message.id).status !== 'dispatching')
           fail('DELIVERY_ABORTED', 'Bridge changed state before transport write.');
-        if (!lease || lease.owner !== owner || lease.expires <= relay.now())
+        if (!lease || lease.owner !== owner || lease.expires <= now)
           fail('DELIVERY_ABORTED', 'Target disconnected or its lease expired before transport write.');
+        writeStarted = true;
       } }),
-      new Promise((_, reject) => { timeout = setTimeout(() => reject(new BridgeError('TIMEOUT', 'Delivery attempt timed out.')), p.delivery_timeout); })
+      timeoutPromise
     ]);
     if (!result || !['acknowledged', 'unconfirmed', 'blocked'].includes(result.status))
       fail('INVALID_RECEIPT', 'Transport returned no trustworthy outcome.');
@@ -317,7 +353,7 @@ export async function dispatchOne(relay, pairId, actor, targetId, owner, adapter
     return relay.finish(message.id, owner, result);
   } catch (error) {
     return relay.finish(message.id, owner, { status: error.code === 'DELIVERY_ABORTED' ? 'blocked' : 'unknown' });
-  } finally { clearTimeout(timeout); }
+  } finally { closed = true; clearTimeout(timeout); }
 }
 
 export { BridgeError, CodexDesktopUnavailable, peer };

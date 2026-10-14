@@ -1,0 +1,12 @@
+{
+  "name": "selected-tab-bridge-candidate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "demo": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=24 <25" }
+}

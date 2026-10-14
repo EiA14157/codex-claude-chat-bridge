@@ -1,0 +1,5 @@
+*.log
+.review/
+node_modules/
+*.zip
+.env*

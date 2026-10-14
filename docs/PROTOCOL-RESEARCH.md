@@ -4,9 +4,9 @@ Reviewed 2026-10-13. This is a local prototype, not a completed bridge between t
 
 ## Current scope
 
-The implementation uses Node 24 and built-in SQLite. The stdio server is written against the official `@modelcontextprotocol/sdk` interface, but its dependency installation did not complete in this cloud environment, so real-SDK integration tests were not run. Two-way routing and Claude-style notification payloads are tested with in-memory fake endpoints. All live-pair traffic remains blocked because a supported adapter into the exact existing Codex desktop chat has not been verified. Configuration strings are labels, not proof that either application is attached to the intended conversation.
+The implementation uses Node 24 and built-in SQLite, with the official MCP SDK pinned to security-fixed version `1.31.0`. The sanitized publication is checked with local relay/candidate fixtures and fake MCP subprocess clients. All core/MCP live traffic remains blocked. Configuration strings are labels, not proof that an application is attached to the intended conversation.
 
-No real chat traffic, session-directory scanning, desktop injection, remote publication, permission relay, or application configuration changes are part of this prototype. Passing local tests establishes only the behavior those tests exercise.
+The test suites do not access real accounts or GUI composers or alter application configuration. Optional SDK metadata lookup is explicit and read-only. Source publication does not unlock live use. Passing local tests establishes only the behavior those tests exercise.
 
 ## Verified protocol facts
 
@@ -16,7 +16,7 @@ The wire extension uses `experimental['claude/channel'] = {}` and `notifications
 
 Custom channels require interactive development-channel opt-in during the preview. Existing conversations may need a restart and explicit resume with channel enablement; this implementation does not promise hot attachment. Provider and organization eligibility must be checked on the actual installation. [Channels](https://code.claude.com/docs/en/channels)
 
-Claude currently cannot register channel servers negotiating MCP revision `2026-07-28`. The package pins SDK `1.28.0`; verify its negotiated protocol in tests rather than assuming compatibility from a package name. Stdio server crashes require recovery; automatic reconnect is not guaranteed. [Claude MCP runtime](https://code.claude.com/docs/en/mcp#push-messages-with-channels)
+Claude currently cannot register channel servers negotiating MCP revision `2026-07-28`. The package now pins security-fixed SDK `1.31.0`. Windows fake-client tests verify `2025-11-25` negotiation for explicit and unsupported-revision requests; real Claude registration is still untested. Verify the negotiated protocol after any update rather than assuming compatibility from a package name. Stdio server crashes require recovery; automatic reconnect is not guaranteed. [Claude MCP runtime](https://code.claude.com/docs/en/mcp#push-messages-with-channels)
 
 ### MCP startup and shutdown
 
