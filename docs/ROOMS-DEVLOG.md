@@ -107,6 +107,19 @@ Grok Bot 데스크톱 앱의 로컬 실행 모드로 `node rooms/cli.mjs` 명령
 - Grok Bot의 피드백: 명령 승인이 막힘 없이 진행됐고, `wait` 대기도 불편하지 않았음(약 13초 만에 답 수신).
 - Grok Bot의 제안: 보내기와 기다리기를 한 명령으로 묶자 → `send --wait` 옵션으로 반영하고 테스트를 추가했습니다.
 
+### 4차 실제 연결: Claude Code channels로 깨우기 (방 `MTSXRW`)
+
+`claude --dangerously-load-development-channels server:bridge`로 시작한 Claude Code 세션이 방에 참가한 뒤 **대기하지 않고 턴을 끝내게** 했습니다. 그 상태에서 다른 참가자가 메시지를 보냈습니다.
+
+```
+01:15:31 tester:      Wake-up test: … reply with the word AWAKE and the current room code.
+01:15:38 claude-code: AWAKE — room MTSXRW
+```
+
+- 쉬고 있던 세션이 "읽지 않은 메시지" 알림을 받고 7초 만에 스스로 `bridge_wait`로 읽고 답했습니다.
+- 참고: Claude 데스크톱 앱은 패키지(MSIX) 앱이라 번들된 `claude.exe`의 실제 위치는 `%LOCALAPPDATA%PackagesClaude_*LocalCacheRoamingClaudeclaude-code<버전>` 아래입니다. 앱 밖의 터미널에서 `%APPDATA%Claude...` 경로로는 찾을 수 없습니다.
+- 이 CLI는 처음 실행할 때 별도 로그인이 필요했습니다.
+
 ### 자동 테스트
 
 - 전체 단위 테스트 통과 (기존 + rooms 9개)
@@ -139,13 +152,13 @@ Codex의 자동 승인(`default_tools_approval_mode`)은 설정 파일에 넣지
 | 여러 차례 주고받는 실제 작업 | ✅ 확인 (헤드리스 Codex ↔ 개발 세션 Claude) |
 | 대시보드 | ✅ 브라우저 확인 |
 | 유령 참가자 회수, 재전달, peerLeft 수정 | ✅ 테스트 |
-| Claude Code channels 알림 | ✅ 알림 형식과 전송은 테스트. 실제 Claude Code에서 `--dangerously-load-development-channels server:bridge`로 표시되는지는 미확인 |
+| Claude Code channels 알림 | ✅ 실제 세션이 알림으로 깨어나 7초 만에 답함 (방 `MTSXRW`) |
 | Grok Bot (로컬 실행 모드 CLI) | ✅ 실제 Grok Bot ↔ Claude 대화 확인 (방 `G2HEMR`) |
 | Grok Bot (원격 HTTP MCP) | ✅ HTTP MCP 클라이언트 테스트. 터널 노출과 실제 Grok Bot 등록은 사용자가 결정할 사항이라 미진행 |
 
 ## 6. 알려진 제약
 
 - 에이전트가 `bridge_wait`를 호출하는 동안에만 수신합니다. Codex는 턴을 끝내면 사용자가 다시 말을 걸어야 합니다. Claude Code는 channels 알림으로 깨울 수 있습니다.
-- 메시지 본문은 로컬 SQLite에 평문으로 저장됩니다. 비밀 정보를 보내지 마세요. `purge`로 방과 기록을 지울 수 있고, 시험에 쓴 방 4개(`MFPPHK`, `BXQD7C`, `G7DCEA`, `G2HEMR`)의 기록은 모두 삭제했습니다. 이 문서의 대화 발췌는 삭제 전에 옮겨 둔 것입니다.
+- 메시지 본문은 로컬 SQLite에 평문으로 저장됩니다. 비밀 정보를 보내지 마세요. `purge`로 방과 기록을 지울 수 있고, 시험에 쓴 방 4개(`MFPPHK`, `BXQD7C`, `G7DCEA`, `G2HEMR`)의 기록은 모두 삭제했습니다(이후 `MTSXRW`도 삭제). 이 문서의 대화 발췌는 삭제 전에 옮겨 둔 것입니다.
 - 같은 사용자 권한의 다른 프로세스에 대한 보안 경계가 아닙니다.
 - 원격 MCP를 터널로 노출하면 원격 키를 아는 누구나 방 코드로 참가할 수 있습니다.
