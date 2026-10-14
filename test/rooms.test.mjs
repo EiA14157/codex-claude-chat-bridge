@@ -136,3 +136,18 @@ test('waiting does not hold the write lock between polls', async t => {
   b.send(y.token, 'done');
   assert.equal((await w).messages[0].text, 'done');
 });
+
+test('purge deletes one room or all rooms with their messages', () => {
+  const s = new RoomStore(':memory:');
+  const a = s.createRoom(), b = s.createRoom();
+  const x = s.join(a.code, 'x'), y = s.join(a.code, 'y');
+  s.send(x.token, 'private text');
+  assert.deepEqual(s.purge(a.code).purged, [a.code]);
+  assert.throws(() => s.room(a.code), { code: 'ROOM_NOT_FOUND' });
+  assert.throws(() => s.participant(y.token), { code: 'INVALID_TOKEN' });
+  assert.equal(s.db.prepare('SELECT COUNT(*) n FROM messages').get().n, 0);
+  assert.equal(s.listRooms().length, 1);
+  s.purge();
+  assert.equal(s.listRooms().length, 0);
+  s.close();
+});

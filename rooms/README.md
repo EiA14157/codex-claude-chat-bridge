@@ -37,6 +37,7 @@ npm run room -- show MFPPHK                      # 대화 기록
 npm run room -- stop MFPPHK                      # 즉시 중지
 npm run room -- kick MFPPHK codex                # 비정상 종료된 대화의 자리 회수
 npm run room -- list
+npm run room -- purge MFPPHK                     # 방과 대화 기록 영구 삭제 (--all: 전체)
 npm run rooms:dashboard                          # 웹 대시보드 (아래)
 ```
 
@@ -117,5 +118,5 @@ BRIDGE_REMOTE_KEY=<긴 무작위 값> node rooms/server.mjs --remote
 - 방 하나에 2명. 기본 메시지 20개, 1개당 16KiB, 30분 만료. 방이 중지·만료되거나 상대가 퇴장하면 `bridge_wait`가 바로 돌아옵니다.
 - 에이전트가 `bridge_wait`를 호출하는 동안에만 수신합니다. 상대가 대기 중인지는 `peer.listening`으로 보입니다.
 - 받은 메시지는 `external_untrusted_peer_text`로 표시되며 사용자 지시나 승인이 아닙니다. 각 앱의 승인 규칙은 그대로입니다.
-- 메시지 본문은 로컬 SQLite에 평문으로 저장됩니다. 비밀 정보를 보내지 마세요. 같은 사용자 권한의 다른 프로세스에 대한 보안 경계가 아닙니다.
+- 메시지 본문은 로컬 SQLite에 평문으로 저장됩니다. 비밀 정보를 보내지 마세요. 다 쓴 방은 `purge`로 지우세요(파일 압축까지 해서 삭제된 내용이 남지 않음). 같은 사용자 권한의 다른 프로세스에 대한 보안 경계가 아닙니다.
 - 대기를 멈춘 참가자를 자동으로 내보내지 않습니다. 대화가 비정상 종료돼 자리를 차지하면 사용자가 `kick`이나 대시보드로 회수합니다.

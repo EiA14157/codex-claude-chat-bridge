@@ -6,7 +6,7 @@ import { callTool } from './tools.mjs';
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   db: { type: 'string' }, topic: { type: 'string' }, 'max-messages': { type: 'string' },
   minutes: { type: 'string' }, json: { type: 'boolean', default: false },
-  name: { type: 'string' }, token: { type: 'string' }, text: { type: 'string' }, 'reply-to': { type: 'string' }, timeout: { type: 'string' }, 'after-seq': { type: 'string' }, wait: { type: 'boolean', default: false }
+  name: { type: 'string' }, token: { type: 'string' }, text: { type: 'string' }, 'reply-to': { type: 'string' }, timeout: { type: 'string' }, 'after-seq': { type: 'string' }, wait: { type: 'boolean', default: false }, all: { type: 'boolean', default: false }
 } });
 const [command, code] = positionals;
 const usage = `Usage:
@@ -15,6 +15,7 @@ const usage = `Usage:
   node rooms/cli.mjs show CODE        (transcript)
   node rooms/cli.mjs stop CODE
   node rooms/cli.mjs kick CODE NAME   (free the slot of a crashed conversation)
+  node rooms/cli.mjs purge CODE | purge --all   (permanently delete rooms and their messages)
 Agent commands (same as the MCP tools; JSON output, for agents that can run commands but not MCP):
   node rooms/cli.mjs join CODE --name NAME
   node rooms/cli.mjs send --token T --text TEXT [--reply-to ID] [--wait [--timeout SEC]]   (--wait: send, then wait for the reply)
@@ -44,6 +45,10 @@ try {
       break;
     }
     case 'stop': { const r = store.stopRoom(code); out = values.json ? r : line(r); break; }
+    case 'purge': {
+      if (!code && !values.all) throw Object.assign(new Error('Give a room code or --all.'), { code: 'INVALID_INPUT' });
+      out = store.purge(values.all ? undefined : code); break;
+    }
     case 'kick': out = store.kick(code, positionals[2]); break;
     case 'join': out = await callTool(store, 'bridge_join', { code, name: values.name }); break;
     case 'send': {

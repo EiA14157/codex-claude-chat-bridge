@@ -249,6 +249,24 @@ export class RoomStore {
     }
   }
 
+  /**
+   * Permanently deletes rooms with their participants and messages (all rooms when code is omitted),
+   * then compacts the file so deleted text does not linger in free pages or the WAL.
+   */
+  purge(c) {
+    const codes = c === undefined ? this.db.prepare('SELECT code FROM rooms').all().map(r => r.code) : [this.room(c).code];
+    this.tx(() => {
+      for (const rc of codes) {
+        this.db.prepare('DELETE FROM messages WHERE room_code=?').run(rc);
+        this.db.prepare('DELETE FROM participants WHERE room_code=?').run(rc);
+        this.db.prepare('DELETE FROM rooms WHERE code=?').run(rc);
+      }
+    });
+    this.db.exec('VACUUM');
+    this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    return { purged: codes };
+  }
+
   transcript(c) {
     const r = this.room(c);
     return { room: r,
