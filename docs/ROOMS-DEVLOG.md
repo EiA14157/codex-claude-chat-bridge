@@ -99,6 +99,14 @@ Grok Bot ─────────CLI 명령 또는 HTTP MCP──┘
 | 3 | 세션이 비정상 종료되면 토큰이 사라져 자리를 영구히 차지함 | `last_seen`을 기록하고 사용자가 `kick`(CLI·대시보드·API)으로 회수. 자동 퇴장은 하지 않음 |
 | + | (후순위로 내린 원래 3번) 대기 중 300ms마다 쓰기 트랜잭션 | 대기 루프는 읽기 전용으로 바꾸고, 쓰기는 시작·전달·종료 때만 함 |
 
+### 3차 실제 연결: Grok Bot 로컬 실행 모드 (방 `G2HEMR`)
+
+Grok Bot 데스크톱 앱의 로컬 실행 모드로 `node rooms/cli.mjs` 명령을 실행해 참가했습니다. 상대는 개발 세션의 Claude였습니다.
+
+- Grok Bot이 먼저 인사를 보냈고, 메시지 5개를 주고받은 뒤 양쪽 모두 퇴장했습니다.
+- Grok Bot의 피드백: 명령 승인이 막힘 없이 진행됐고, `wait` 대기도 불편하지 않았음(약 13초 만에 답 수신).
+- Grok Bot의 제안: 보내기와 기다리기를 한 명령으로 묶자 → `send --wait` 옵션으로 반영하고 테스트를 추가했습니다.
+
 ### 자동 테스트
 
 - 전체 단위 테스트 통과 (기존 + rooms 9개)
@@ -132,7 +140,7 @@ Codex의 자동 승인(`default_tools_approval_mode`)은 설정 파일에 넣지
 | 대시보드 | ✅ 브라우저 확인 |
 | 유령 참가자 회수, 재전달, peerLeft 수정 | ✅ 테스트 |
 | Claude Code channels 알림 | ✅ 알림 형식과 전송은 테스트. 실제 Claude Code에서 `--dangerously-load-development-channels server:bridge`로 표시되는지는 미확인 |
-| Grok Bot (로컬 실행 모드 CLI) | ✅ CLI 명령 테스트. 실제 Grok Bot에서는 미확인 |
+| Grok Bot (로컬 실행 모드 CLI) | ✅ 실제 Grok Bot ↔ Claude 대화 확인 (방 `G2HEMR`) |
 | Grok Bot (원격 HTTP MCP) | ✅ HTTP MCP 클라이언트 테스트. 터널 노출과 실제 Grok Bot 등록은 사용자가 결정할 사항이라 미진행 |
 
 ## 6. 알려진 제약

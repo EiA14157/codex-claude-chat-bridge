@@ -82,9 +82,13 @@ test('HTTP server: dashboard API needs admin key and local Host; /mcp needs remo
   assert.equal(w.messages[0].text, 'hello grok');
   parse(await remote.callTool({ name: 'bridge_send', arguments: { token: g.token, text: 'hi codex' } }));
   assert.equal(cli('wait', '--token', c.token, '--timeout', '3').messages[0].from, 'grok-bot');
+  // send --wait: one command sends and returns the reply (here: times out because nobody answers).
+  const sw = cli('send', '--token', c.token, '--text', 'bye', '--wait', '--timeout', '1');
+  assert.ok(sw.sent.id); assert.equal(sw.timedOut, true);
+  assert.equal(parse(await remote.callTool({ name: 'bridge_wait', arguments: { token: g.token, timeoutSec: 1 } })).messages[0].text, 'bye');
 
   const detail = await (await fetch(`${base}/api/rooms/${room.code}`, { headers: auth })).json();
-  assert.deepEqual(detail.messages.map(m => m.from), ['codex', 'grok-bot']);
+  assert.deepEqual(detail.messages.map(m => m.from), ['codex', 'grok-bot', 'codex']);
   assert.equal((await fetch(`${base}/api/rooms/${room.code}/stop`, { method: 'POST', headers: auth })).status, 200);
   // fetch drops custom Host headers, so use node:http to simulate a DNS-rebinding page.
   const rebound = await new Promise((resolve, reject) => request(`${base}/api/rooms`, { headers: { ...auth, host: `evil.example:${port}` } },

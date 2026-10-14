@@ -6,7 +6,7 @@ import { callTool } from './tools.mjs';
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   db: { type: 'string' }, topic: { type: 'string' }, 'max-messages': { type: 'string' },
   minutes: { type: 'string' }, json: { type: 'boolean', default: false },
-  name: { type: 'string' }, token: { type: 'string' }, text: { type: 'string' }, 'reply-to': { type: 'string' }, timeout: { type: 'string' }, 'after-seq': { type: 'string' }
+  name: { type: 'string' }, token: { type: 'string' }, text: { type: 'string' }, 'reply-to': { type: 'string' }, timeout: { type: 'string' }, 'after-seq': { type: 'string' }, wait: { type: 'boolean', default: false }
 } });
 const [command, code] = positionals;
 const usage = `Usage:
@@ -17,7 +17,7 @@ const usage = `Usage:
   node rooms/cli.mjs kick CODE NAME   (free the slot of a crashed conversation)
 Agent commands (same as the MCP tools; JSON output, for agents that can run commands but not MCP):
   node rooms/cli.mjs join CODE --name NAME
-  node rooms/cli.mjs send --token T --text TEXT [--reply-to ID]
+  node rooms/cli.mjs send --token T --text TEXT [--reply-to ID] [--wait [--timeout SEC]]   (--wait: send, then wait for the reply)
   node rooms/cli.mjs wait --token T [--timeout SEC] [--after-seq N]
   node rooms/cli.mjs status|leave --token T
 Options: --db FILE (default ${defaultDbPath()}, or BRIDGE_DB), --json`;
@@ -46,7 +46,12 @@ try {
     case 'stop': { const r = store.stopRoom(code); out = values.json ? r : line(r); break; }
     case 'kick': out = store.kick(code, positionals[2]); break;
     case 'join': out = await callTool(store, 'bridge_join', { code, name: values.name }); break;
-    case 'send': out = await callTool(store, 'bridge_send', { token: values.token, text: values.text, replyTo: values['reply-to'] }); break;
+    case 'send': {
+      const sent = await callTool(store, 'bridge_send', { token: values.token, text: values.text, replyTo: values['reply-to'] });
+      // One command per round trip halves approvals for agents that confirm every local command (Grok Bot's suggestion).
+      out = values.wait ? { sent, ...(await callTool(store, 'bridge_wait', { token: values.token, timeoutSec: num(values.timeout) })) } : sent;
+      break;
+    }
     case 'wait': out = await callTool(store, 'bridge_wait', { token: values.token, timeoutSec: num(values.timeout), afterSeq: num(values['after-seq']) }); break;
     case 'status': case 'leave': out = await callTool(store, 'bridge_' + command, { token: values.token }); break;
     default: console.error(usage); process.exitCode = 2;
