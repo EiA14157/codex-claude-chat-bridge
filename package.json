@@ -11,10 +11,13 @@
     "test": "node --test test/*.test.mjs",
     "test:mcp": "node --test integration/*.test.mjs",
     "demo": "node src/cli.mjs demo",
-    "check": "node --check src/core.mjs && node --check src/adapters.mjs && node --check src/codex-app-tools.mjs && node --check src/claude-session-metadata.mjs && node --check src/claude-live-capabilities.mjs && node --check src/monitor.mjs && node --check src/one-shot-exchange.mjs && node --check src/mcp.mjs && node --check src/cli.mjs && node --test test/*.test.mjs",
+    "check": "node --check src/core.mjs && node --check src/adapters.mjs && node --check src/codex-app-tools.mjs && node --check src/claude-session-metadata.mjs && node --check src/claude-live-capabilities.mjs && node --check src/monitor.mjs && node --check src/one-shot-exchange.mjs && node --check src/mcp.mjs && node --check src/cli.mjs && node --check rooms/store.mjs && node --check rooms/mcp.mjs && node --check rooms/cli.mjs && node --check rooms/tools.mjs && node --check rooms/server.mjs && node --test test/*.test.mjs",
     "test:extension": "npm --prefix browser-extension run check",
     "audit:package": "node scripts/audit-package.mjs",
-    "hash:package": "node scripts/hash-package.mjs"
+    "hash:package": "node scripts/hash-package.mjs",
+    "room": "node rooms/cli.mjs",
+    "rooms:mcp": "node rooms/mcp.mjs",
+    "rooms:dashboard": "node rooms/server.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.31.0"

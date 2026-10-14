@@ -6,7 +6,7 @@ const result = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-
 if (result.status) throw Error('Cannot list publication candidates');
 const files = [...new Set(result.stdout.trim().split(/\r?\n/).filter(Boolean))];
 const allowed = file => ['.gitattributes', '.gitignore', 'README.md', 'SHA256SUMS', 'package.json', 'package-lock.json'].includes(file) ||
-  /^(src|test|integration|scripts)\/[^/]+\.mjs$/.test(file) || /^docs\/[A-Z0-9_-]+\.md$/.test(file) ||
+  /^(src|test|integration|scripts|rooms)\/[^/]+\.mjs$/.test(file) || /^rooms\/[^/]+\.(html|md)$/.test(file) ||/^docs\/[A-Z0-9_-]+\.md$/.test(file) ||
   ['browser-extension/.gitignore', 'browser-extension/README.md', 'browser-extension/package.json'].includes(file) ||
   /^browser-extension\/(extension|demo|docs|scripts|test)\/[^/]+\.(mjs|html|css|json|md)$/.test(file);
 const patterns = [

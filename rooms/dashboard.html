@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bridge Rooms</title>
+<style>
+:root{--bg:#f6f5f2;--panel:#fff;--line:#e4e1da;--text:#1d1c1a;--muted:#77736b;--accent:#2f6b57;--accent-soft:#e3efe9;--danger:#a3402f;--danger-soft:#f8e6e2;--me:#eef1f8;--peer:#f3efe6;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--panel:#1f1f1c;--line:#34332f;--text:#ecebe6;--muted:#9a968c;--accent:#7cc3a6;--accent-soft:#22352d;--danger:#e58a78;--danger-soft:#3a2420;--me:#232733;--peer:#2c2922;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif}
+header{display:flex;align-items:baseline;gap:12px;padding:18px 24px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0;letter-spacing:-.3px}
+header .sub{color:var(--muted);font-size:12px}
+main{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 60px)}
+aside{border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:16px}
+form{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px}
+form .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label{font-size:11px;color:var(--muted);display:grid;gap:4px}
+input{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text)}
+button{font:inherit;font-weight:600;font-size:13px;border:0;border-radius:7px;padding:8px 12px;cursor:pointer;background:var(--accent);color:#fff}
+@media (prefers-color-scheme:dark){button{color:#10201a}}
+button.link{all:unset;cursor:pointer;color:var(--danger);font-size:11px;text-decoration:underline;margin-left:4px}
+button.danger{background:var(--danger-soft);color:var(--danger)}
+button:disabled{opacity:.4;cursor:default}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+li button{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;padding:10px 12px;border-radius:9px;border:1px solid transparent}
+li button:hover{background:var(--panel)}
+li button[aria-current=true]{background:var(--panel);border-color:var(--line)}
+.code{font:600 14px ui-monospace,Consolas,monospace;letter-spacing:1px}
+.meta{font-size:11px;color:var(--muted)}
+.badge{display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:99px;margin-left:6px;vertical-align:1px;background:var(--accent-soft);color:var(--accent)}
+.badge.off{background:var(--line);color:var(--muted)}
+section{padding:20px 28px;display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top h2{margin:0;font-size:20px}
+.people{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 16px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--line);margin-right:5px}
+.dot.on{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.join{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px}
+.join code{font:12px ui-monospace,Consolas,monospace;background:var(--bg);padding:2px 6px;border-radius:5px}
+.log{display:flex;flex-direction:column;gap:10px}
+.msg{max-width:760px;padding:10px 14px;border-radius:12px;background:var(--peer);white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.a{background:var(--me);align-self:flex-end}
+.msg .who{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+.err{color:var(--danger);font-size:12px}
+@media (max-width:760px){main{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}section{padding:16px}}
+</style>
+</head>
+<body>
+<header><h1>Bridge Rooms</h1><span class="sub">사용자가 고른 두 대화를 연결 · 로컬 전용</span></header>
+<main>
+  <aside>
+    <form id="create">
+      <label>주제<input name="topic" maxlength="200" placeholder="예: API 설계 리뷰"></label>
+      <div class="row">
+        <label>메시지 예산<input name="maxMessages" type="number" min="1" max="200" value="20"></label>
+        <label>만료(분)<input name="minutes" type="number" min="1" max="1440" value="30"></label>
+      </div>
+      <button>새 방 만들기</button>
+      <div id="create-err" class="err" role="alert"></div>
+    </form>
+    <ul id="rooms"></ul>
+  </aside>
+  <section id="detail"><div class="empty">방을 선택하거나 새로 만드세요.</div></section>
+</main>
+<script>
+let key = null;
+// The key arrives in the URL fragment (never sent to the server or logs); a restarted server prints a new one.
+function readKey() {
+  const m = location.hash.match(/key=([\w-]+)/);
+  try { if (m) sessionStorage.setItem('bridgeKey', m[1]); key = m?.[1] ?? sessionStorage.getItem('bridgeKey'); } catch { key = m?.[1] ?? key; }
+  if (m) history.replaceState(null, '', location.pathname);
+}
+readKey();
+addEventListener('hashchange', () => { readKey(); lastRender = ''; loop(); });
+const api = async (path, opts = {}) => {
+  const r = await fetch('/api' + path, { ...opts, headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' } });
+  const body = await r.json(); if (!r.ok) throw new Error(body.message || body.error); return body;
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const time = t => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const statusKo = { active: '진행 중', stopped: '중지됨', expired: '만료' };
+let selected = null, lastRender = '';
+
+async function refreshRooms() {
+  const { rooms } = await api('/rooms');
+  document.getElementById('rooms').innerHTML = rooms.map(r => `<li><button data-code="${r.code}" aria-current="${r.code === selected}">
+    <span class="code">${r.code}</span><span class="badge ${r.status === 'active' ? '' : 'off'}">${statusKo[r.status]}</span>
+    <div class="meta">${esc(r.topic) || '주제 없음'} · ${r.messagesUsed}/${r.maxMessages}</div></button></li>`).join('') || '<li class="meta">아직 방이 없습니다.</li>';
+}
+async function refreshDetail() {
+  const el = document.getElementById('detail');
+  if (!selected) return;
+  const t = await api('/rooms/' + selected);
+  const html = render(t);
+  if (html !== lastRender) { const atBottom = innerHeight + scrollY >= document.body.scrollHeight - 40; el.innerHTML = html; lastRender = html; if (atBottom) scrollTo(0, document.body.scrollHeight); }
+}
+function render({ room, participants, messages, listening }) {
+  const first = participants[0]?.name;
+  const people = participants.map(p => `<span><span class="dot ${!p.left_at && listening[p.name] ? 'on' : ''}"></span>${esc(p.name)} ${p.left_at ? '(퇴장)' : listening[p.name] ? '· 대기 중' : `· 마지막 활동 ${time(p.last_seen)}`}${!p.left_at && room.status === 'active' ? ` <button class="link" data-kick="${esc(p.name)}">내보내기</button>` : ''}</span>`).join('') || '<span>아직 아무도 참가하지 않았습니다</span>';
+  return `<div class="top"><h2 class="code">${room.code}</h2><span class="badge ${room.status === 'active' ? '' : 'off'}">${statusKo[room.status]}</span>
+      <span class="meta">${esc(room.topic)} · ${room.messagesUsed}/${room.maxMessages} 메시지 · ${time(room.expires)}까지</span>
+      ${room.status === 'active' ? '<button class="danger" id="stop">방 중지</button>' : ''}</div>
+    <div class="people">${people}</div>
+    ${room.status === 'active' && participants.filter(p => !p.left_at).length < 2 ? `<div class="join">공유할 대화창에 입력하세요: <code>브리지 방 ${room.code}에 참가해</code></div>` : ''}
+    <div class="log">${messages.map(m => `<div class="msg ${m.from === first ? 'a' : ''}"><div class="who">${esc(m.from)} · ${time(m.at)}</div>${esc(m.text)}</div>`).join('') || '<div class="empty">아직 메시지가 없습니다.</div>'}</div>`;
+}
+document.getElementById('rooms').addEventListener('click', e => {
+  const b = e.target.closest('button[data-code]'); if (!b) return;
+  selected = b.dataset.code; lastRender = ''; refreshRooms(); refreshDetail();
+});
+document.getElementById('detail').addEventListener('click', async e => {
+  const kick = e.target.dataset?.kick;
+  if (kick) {
+    if (!confirm(`${kick} 참가자를 내보낼까요? 대화가 비정상 종료돼 자리를 차지하고 있을 때만 쓰세요.`)) return;
+    await api(`/rooms/${selected}/kick`, { method: 'POST', body: JSON.stringify({ name: kick }) }); lastRender = ''; return refreshDetail();
+  }
+  if (e.target.id !== 'stop' || !confirm(`방 ${selected}을 중지할까요? 다시 열 수 없습니다.`)) return;
+  await api(`/rooms/${selected}/stop`, { method: 'POST' }); refreshRooms(); refreshDetail();
+});
+document.getElementById('create').addEventListener('submit', async e => {
+  e.preventDefault(); const f = new FormData(e.target), err = document.getElementById('create-err'); err.textContent = '';
+  try {
+    const r = await api('/rooms', { method: 'POST', body: JSON.stringify({ topic: f.get('topic'), maxMessages: Number(f.get('maxMessages')), minutes: Number(f.get('minutes')) }) });
+    selected = r.code; lastRender = ''; e.target.topic.value = ''; await refreshRooms(); await refreshDetail();
+  } catch (x) { err.textContent = x.message; }
+});
+const loop = async () => { try { await refreshRooms(); await refreshDetail(); } catch (x) { document.getElementById('detail').innerHTML = `<div class="empty err">${esc(x.message)} — 서버를 다시 시작했다면 새 주소로 여세요.</div>`; } };
+loop(); setInterval(loop, 1500);
+</script>
+</body>
+</html>

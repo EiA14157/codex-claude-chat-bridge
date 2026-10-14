@@ -6,6 +6,7 @@ A local relay and a separate Chromium extension candidate for explicitly selecte
 
 | Component | Scope |
 | --- | --- |
+| **[Bridge rooms](rooms/README.md)** | **Working: user-selected Claude Code ↔ Codex conversations via MCP; dashboard; channel nudges; Grok Bot CLI/HTTP paths. See [dev log](docs/ROOMS-DEVLOG.md)** |
 | Node 24 SQLite relay and CLI | Immutable routing, deduplication, leases, budgets, expiry, pause/stop and simulator |
 | Official MCP SDK stdio server | Simulation-only fake-client integration; security-fixed SDK `1.31.0` |
 | Codex app-tool candidate | Injected supported host callbacks and per-message authorization; no standalone binding |
