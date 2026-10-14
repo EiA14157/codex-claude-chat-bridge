@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+import { parseArgs } from 'node:util';
+import { RoomStore, defaultDbPath } from './store.mjs';
+
+const { values, positionals } = parseArgs({ allowPositionals: true, options: {
+  db: { type: 'string' }, topic: { type: 'string' }, 'max-messages': { type: 'string' },
+  minutes: { type: 'string' }, json: { type: 'boolean', default: false }
+} });
+const [command, code] = positionals;
+const usage = `Usage:
+  node rooms/cli.mjs create [--topic TEXT] [--max-messages N] [--minutes N]
+  node rooms/cli.mjs list
+  node rooms/cli.mjs show CODE        (transcript)
+  node rooms/cli.mjs stop CODE
+Options: --db FILE (default ${defaultDbPath()}, or BRIDGE_DB), --json`;
+
+const store = new RoomStore(values.db ?? defaultDbPath());
+const num = v => v === undefined ? undefined : Number(v);
+const time = t => new Date(t).toLocaleTimeString();
+const line = r => `${r.code}  ${r.status.padEnd(7)}  ${r.messagesUsed}/${r.maxMessages} msgs  until ${time(r.expires)}${r.topic ? '  ' + r.topic : ''}`;
+try {
+  let out;
+  switch (command) {
+    case 'create': {
+      const r = store.createRoom({ topic: values.topic, maxMessages: num(values['max-messages']), minutes: num(values.minutes) });
+      out = values.json ? r : `Room ${r.code} created (${r.maxMessages} messages, until ${time(r.expires)}).\n` +
+        `Tell each conversation: "브리지 방 ${r.code}에 참가해" / "Join bridge room ${r.code}".`;
+      break;
+    }
+    case 'list': { const rs = store.listRooms(); out = values.json ? rs : rs.map(line).join('\n') || 'No rooms.'; break; }
+    case 'show': {
+      const t = store.transcript(code);
+      out = values.json ? t : [line(t.room),
+        'Participants: ' + (t.participants.map(p => p.name + (p.left_at ? ' (left)' : '')).join(', ') || 'none'), '',
+        ...t.messages.map(m => `[${time(m.at)}] ${m.from}: ${m.text}`)].join('\n');
+      break;
+    }
+    case 'stop': { const r = store.stopRoom(code); out = values.json ? r : line(r); break; }
+    default: console.error(usage); process.exitCode = 2;
+  }
+  if (out !== undefined) console.log(typeof out === 'string' ? out : JSON.stringify(out, null, 2));
+} catch (error) {
+  console.error(`${error.code ?? 'ERROR'}: ${error.message}`); process.exitCode = 1;
+} finally { store.close(); }
